@@ -51,7 +51,8 @@ model Bike {
   mileageKm     Int?
   /// Horas de uso declaradas para motocicletas usadas (opcional, decimal).
   usageHours    Float?
-  price         Float
+  /// Precio opcional: null = "Precio a consultar" en el catálogo.
+  price         Float?
   currency      String      @default("ARS")
   description   String?
   status        BikeStatus  @default(DISPONIBLE)

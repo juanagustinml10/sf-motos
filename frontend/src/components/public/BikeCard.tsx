@@ -89,13 +89,14 @@ export const BikeCard: React.FC<BikeCardProps> = ({ bike, className, tone = 'dar
           </h3>
         </Link>
         <p className={cn('mt-2 text-xs', light ? 'text-black/55' : 'text-gray-400')}>
-          {formatDisplacement(bike.displacementCc)} · {formatMileage(bike.mileageKm)}
+          {formatDisplacement(bike.displacementCc)} ·{' '}
+          {formatMileage(bike.condition === 'NUEVA' ? 0 : bike.mileageKm)}
         </p>
 
         <div className={cn('mt-auto flex items-end justify-between gap-3 border-t pt-4', light ? 'border-black/10' : 'border-white/10')}>
           <div>
             <p className={cn('text-[9px] font-bold uppercase tracking-[0.25em]', light ? 'text-black/45' : 'text-gray-500')}>
-              Precio publicado
+              Precio
             </p>
             <p className="mt-0.5 font-display text-2xl font-extrabold leading-none text-sf-red sm:text-3xl">
               {formatPrice(bike.price, bike.currency)}

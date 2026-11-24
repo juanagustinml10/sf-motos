@@ -37,7 +37,8 @@ export interface CreateBikeInput {
   mileageKm?: number | null;
   /** Decimal opcional; se envía null para motos 0 km o cuando no hay dato. */
   usageHours?: number | null;
-  price: number;
+  /** Omitir o enviar null cuando el precio no está declarado. */
+  price?: number | null;
   currency?: string;
   description?: string | null;
   features?: Array<{ key: string; value: string }>;

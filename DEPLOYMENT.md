@@ -99,6 +99,7 @@ Migraciones versionadas en `backend/prisma/migrations`, **ya aplicadas en Neon y
 - `20261119000000_add_image_blobs`
 - `20261121000000_optimize_images`
 - `20261121010000_add_bike_usage`
+- `20261124190000_price_optional` (24/11/2026: `Bike.price` ahora es nullable; las publicaciones existentes conservan su precio)
 
 Para una base nueva, ejecutar una sola vez con las cadenas directas disponibles:
 
@@ -112,6 +113,10 @@ Nunca `db push` ni reiniciar el historial de migraciones.
 ### Usuario administrador
 
 Existe un usuario `ADMIN` creado en Neon. Sus credenciales **no se versionan**; se entregaron fuera del repositorio. El panel está en `https://sf-motos.pages.dev/admin`. El registro público de administradores no existe (el alta es solo por seed/insercion controlada). Si se pierden las credenciales, crear otro admin con `backend/prisma/seed.ts` definiendo `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` localmente y ejecutando `npm run prisma:seed` **una sola vez**.
+
+### Campos opcionales de una publicación
+
+Desde el 24/11/2026 el precio, el kilometraje y las horas de uso son opcionales en el panel y en la API. `price = null` se muestra como **"Precio a consultar"** en tarjetas, ficha y comparador; `mileageKm = null` se muestra como **"Sin dato"** en motos usadas (las 0 km siguen mostrando "0 km"). Los filtros por rango de precio siguen aplicando solo a motos con precio cargado y el orden por precio las coloca al final.
 
 ### Marcas
 

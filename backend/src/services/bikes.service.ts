@@ -38,7 +38,8 @@ export interface CreateBikeInput {
   mileageKm?: number | null;
   /** Horas de uso: opcional, decimal y solo relevante en motos usadas. */
   usageHours?: number | null;
-  price: number;
+  /** Precio opcional: null se muestra como "Precio a consultar". */
+  price?: number | null;
   currency: string;
   description?: string | null;
   status: BikeStatusValue;

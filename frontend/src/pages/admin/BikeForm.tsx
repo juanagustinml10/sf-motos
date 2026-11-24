@@ -29,7 +29,7 @@ import { getApiErrorMessage } from '@/lib/api-error';
 import { prepareImageForUpload } from '@/lib/image-upload';
 import { cn } from '@/lib/utils';
 import { BIKE_USAGES, MAX_IMAGES_PER_BIKE, MAX_MODEL_YEAR, MODEL_YEARS } from '@/lib/constants';
-import { usageLabel } from '@/lib/format';
+import { formatPrice, usageLabel } from '@/lib/format';
 import { getThumbnailUrl } from '@/lib/images';
 
 const CONDITIONS: BikeCondition[] = ['NUEVA', 'USADA'];
@@ -94,6 +94,14 @@ const emptyForm: FormValues = {
 
 const byOrder = (a: BikeImage, b: BikeImage) => a.order - b.order;
 
+/** Campo vacío (o valor inválido) se envía como null: la API lo acepta. */
+const optionalNumber = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export const BikeForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   // Si la creación terminó pero fallaron las fotos, seguimos en edición para
@@ -131,7 +139,7 @@ export const BikeForm: React.FC = () => {
           brandId: b.brandId,
           model: b.model,
           year: b.year,
-          price: String(b.price),
+          price: b.price == null ? '' : String(b.price),
           currency: b.currency,
           condition: b.condition,
           usage: b.usage ?? '',
@@ -165,7 +173,7 @@ export const BikeForm: React.FC = () => {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const validSteps: Record<number, boolean> = {
-    1: Boolean(form.title.trim()) && Boolean(form.brandId) && Boolean(form.model.trim()) && Number(form.price) > 0,
+    1: Boolean(form.title.trim()) && Boolean(form.brandId) && Boolean(form.model.trim()),
     2: form.condition === 'NUEVA' || form.condition === 'USADA',
     3: true,
     4: true,
@@ -263,7 +271,7 @@ export const BikeForm: React.FC = () => {
   const save = async (status: BikeStatus) => {
     if (!canSave) {
       setStep(1);
-      setError('Completá título, marca, modelo y precio antes de guardar.');
+      setError('Completá título, marca y modelo antes de guardar.');
       return;
     }
 
@@ -284,13 +292,10 @@ export const BikeForm: React.FC = () => {
         year: form.year,
         condition: form.condition,
         usage: form.usage || null,
-        displacementCc: form.displacementCc ? Number(form.displacementCc) : null,
-        mileageKm: form.mileageKm ? Number(form.mileageKm) : null,
-        usageHours:
-          form.condition === 'USADA' && form.usageHours !== ''
-            ? Number(form.usageHours)
-            : null,
-        price: Number(form.price),
+        displacementCc: optionalNumber(form.displacementCc),
+        mileageKm: optionalNumber(form.mileageKm),
+        usageHours: form.condition === 'USADA' ? optionalNumber(form.usageHours) : null,
+        price: optionalNumber(form.price),
         currency: form.currency,
         description: form.description.trim() || null,
         features: features
@@ -494,15 +499,15 @@ export const BikeForm: React.FC = () => {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="bike-price" className={labelClass}>Precio</label>
+                  <label htmlFor="bike-price" className={labelClass}>Precio (opcional)</label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sf-ink-500">$</span>
                       <input
                         id="bike-price"
-                        required
                         type="number"
                         min="0"
+                        step="any"
                         value={form.price}
                         onChange={(event) => update('price', event.target.value)}
                         className={cn(inputClass, 'pl-7')}
@@ -518,6 +523,9 @@ export const BikeForm: React.FC = () => {
                       <option value="USD">USD</option>
                     </select>
                   </div>
+                  <p className="text-[11px] leading-relaxed text-sf-ink-500">
+                    Si lo dejás vacío, la ficha muestra “Precio a consultar”.
+                  </p>
                 </div>
               </div>
             </section>
@@ -610,7 +618,7 @@ export const BikeForm: React.FC = () => {
                 </div>
                 {form.condition === 'USADA' && (
                   <div className="space-y-2">
-                    <label htmlFor="bike-km" className={labelClass}>Kilometraje (km)</label>
+                    <label htmlFor="bike-km" className={labelClass}>Kilometraje (km, opcional)</label>
                     <input
                       id="bike-km"
                       type="number"
@@ -620,11 +628,14 @@ export const BikeForm: React.FC = () => {
                       onChange={(event) => update('mileageKm', event.target.value)}
                       className={inputClass}
                     />
+                    <p className="text-[11px] leading-relaxed text-sf-ink-500">
+                      Si lo dejás vacío se muestra “Sin dato”.
+                    </p>
                   </div>
                 )}
                 {form.condition === 'USADA' && (
                   <div className="space-y-2">
-                    <label htmlFor="bike-hours" className={labelClass}>Horas de uso</label>
+                    <label htmlFor="bike-hours" className={labelClass}>Horas de uso (opcional)</label>
                     <input
                       id="bike-hours"
                       type="number"
@@ -872,7 +883,9 @@ export const BikeForm: React.FC = () => {
                 <div className="rounded-none border border-sf-border bg-sf-elevated/40 p-4">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-sf-ink-500">La moto</p>
                   <p className="mt-2 truncate text-sm font-semibold text-white">{form.title || 'Sin título'}</p>
-                  <p className="mt-1 text-xs text-sf-ink-500">{form.year} · {form.currency} {form.price || '—'}</p>
+                  <p className="mt-1 text-xs text-sf-ink-500">
+                    {form.year} · {formatPrice(optionalNumber(form.price), form.currency)}
+                  </p>
                   <p className="mt-1 text-xs text-sf-ink-500">Uso: {usageLabel(form.usage || null)}</p>
                 </div>
                 <div className="rounded-none border border-sf-border bg-sf-elevated/40 p-4">

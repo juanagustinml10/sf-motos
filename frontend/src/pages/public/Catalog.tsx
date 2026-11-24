@@ -48,11 +48,19 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 const PAGE_SIZE = 12;
 const FETCH_LIMIT = 100;
 
+/** Las motos sin precio van siempre al final, en ambos sentidos. */
+const comparePrice = (a: Bike, b: Bike, direction: 1 | -1) => {
+  if (a.price == null && b.price == null) return 0;
+  if (a.price == null) return 1;
+  if (b.price == null) return -1;
+  return direction * (a.price - b.price);
+};
+
 const sortBikes = (items: Bike[], key: SortKey): Bike[] => {
   const sorted = [...items];
   switch (key) {
-    case 'precio-asc': return sorted.sort((a, b) => a.price - b.price);
-    case 'precio-desc': return sorted.sort((a, b) => b.price - a.price);
+    case 'precio-asc': return sorted.sort((a, b) => comparePrice(a, b, 1));
+    case 'precio-desc': return sorted.sort((a, b) => comparePrice(a, b, -1));
     case 'anio-desc': return sorted.sort((a, b) => b.year - a.year);
     case 'anio-asc': return sorted.sort((a, b) => a.year - b.year);
     case 'marca-asc': return sorted.sort((a, b) => (a.brand?.name ?? '').localeCompare(b.brand?.name ?? '', 'es'));

@@ -158,7 +158,7 @@ export const BikeDetail: React.FC = () => {
   const specs = [
     { icon: <Calendar size={18} />, label: 'Año', value: String(bike.year) },
     { icon: <Gauge size={18} />, label: 'Cilindrada', value: formatDisplacement(bike.displacementCc) },
-    { icon: <Fuel size={18} />, label: 'Kilómetros', value: formatMileage(bike.mileageKm) },
+    { icon: <Fuel size={18} />, label: 'Kilómetros', value: formatMileage(bike.condition === 'NUEVA' ? 0 : bike.mileageKm) },
     ...(usageHours ? [{ icon: <Timer size={18} />, label: 'Horas de uso', value: usageHours }] : []),
     ...(bike.usage ? [{ icon: <Route size={18} />, label: 'Uso', value: usageLabel(bike.usage) }] : []),
     { icon: <Tag size={18} />, label: 'Categoría', value: bike.condition === 'NUEVA' ? '0 km' : 'Usada' },
@@ -290,12 +290,17 @@ export const BikeDetail: React.FC = () => {
             {/* Precio */}
             <div className="relative mt-7 border-y border-white/10 bg-sf-surface/60 py-6 pl-5 pr-5">
               <div className="absolute inset-y-0 left-0 w-[3px] bg-sf-red" aria-hidden="true" />
-              <p className="field-label">Precio publicado</p>
-              <p className="mt-1 break-words font-display text-5xl font-extrabold leading-none text-white sm:text-6xl">
+              <p className="field-label">{bike.price == null ? 'Precio' : 'Precio publicado'}</p>
+              <p className={cn(
+                'mt-1 break-words font-display font-extrabold leading-none text-white',
+                bike.price == null ? 'text-3xl sm:text-4xl' : 'text-5xl sm:text-6xl'
+              )}>
                 {formatPrice(bike.price, bike.currency)}
               </p>
               <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
-                Precio informado por la concesionaria. Consultanos por disponibilidad y condiciones de esta unidad.
+                {bike.price == null
+                  ? 'Consultanos por el precio, la disponibilidad y las condiciones de esta unidad.'
+                  : 'Precio informado por la concesionaria. Consultanos por disponibilidad y condiciones de esta unidad.'}
               </p>
             </div>
 

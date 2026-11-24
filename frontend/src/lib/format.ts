@@ -2,12 +2,12 @@ import { BIKE_USAGES } from '@/lib/constants';
 import type { BikeCondition, BikeStatus, BikeUsage } from '@/types';
 
 /** Formato monetario único para todo el frontend. */
-export const formatPrice = (price: number, currency = 'ARS') =>
-  `$${price.toLocaleString('es-AR')} ${currency}`;
+export const formatPrice = (price: number | null | undefined, currency = 'ARS') =>
+  price == null ? 'Precio a consultar' : `$${price.toLocaleString('es-AR')} ${currency}`;
 
-/** Kilometraje: las unidades 0 km no declaran kilometraje en la API. */
+/** Kilometraje opcional: null se muestra como "Sin dato", nunca como 0 km. */
 export const formatMileage = (km: number | null | undefined) =>
-  km == null ? '0 km' : `${km.toLocaleString('es-AR')} km`;
+  km == null ? 'Sin dato' : `${km.toLocaleString('es-AR')} km`;
 
 export const formatDisplacement = (cc: number | null | undefined) =>
   cc ? `${cc} cc` : 'A confirmar';

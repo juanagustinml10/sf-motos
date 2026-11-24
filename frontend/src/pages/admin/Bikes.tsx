@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Link } from '@/components/shared/Link';
 import { bikesService } from '@/services/bikes';
+import { formatPrice } from '@/lib/format';
 import { getThumbnailUrl } from '@/lib/images';
 import type { Bike, BikeStatus } from '@/types';
 
@@ -218,7 +219,7 @@ export const Bikes = () => {
                   </div>
                   <div className="mt-4 flex items-center justify-between gap-3 border-t border-sf-border pt-3">
                     <span className="font-display text-lg text-white">
-                      {bike.price.toLocaleString('es-AR')} {bike.currency}
+                      {formatPrice(bike.price, bike.currency)}
                     </span>
                     <div className="flex gap-2">
                       <Link
@@ -307,7 +308,7 @@ export const Bikes = () => {
                       </td>
                       <td className="px-4 py-4">
                         <span className="font-display text-base text-white">
-                          {bike.price.toLocaleString('es-AR')} {bike.currency}
+                          {formatPrice(bike.price, bike.currency)}
                         </span>
                       </td>
                       <td className="px-4 py-4">

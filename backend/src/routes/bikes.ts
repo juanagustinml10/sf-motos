@@ -60,7 +60,8 @@ const createBikeSchema = z.object({
   mileageKm: z.coerce.number().int().nonnegative().optional().nullable(),
   // Opcional y decimal. Solo se muestra en fichas de motos usadas con valor > 0.
   usageHours: z.coerce.number().nonnegative('Las horas de uso no pueden ser negativas').optional().nullable(),
-  price: z.coerce.number().positive('El precio debe ser mayor a 0'),
+  // Opcional: null (o ausente) significa "Precio a consultar".
+  price: z.coerce.number().positive('El precio debe ser mayor a 0').optional().nullable(),
   currency: z.string().length(3, 'Moneda inválida').default('ARS'),
   description: z.string().optional().nullable(),
   features: z

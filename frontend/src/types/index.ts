@@ -53,7 +53,8 @@ export interface Bike {
   mileageKm: number | null;
   /** Horas de uso declaradas en motos usadas; null/0 significa "sin dato". */
   usageHours: number | null;
-  price: number;
+  /** null = precio no declarado; se muestra como "Precio a consultar". */
+  price: number | null;
   currency: string;
   description: string | null;
   status: BikeStatus;
