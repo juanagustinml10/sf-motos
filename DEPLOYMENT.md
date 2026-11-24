@@ -74,6 +74,7 @@ Con `STORAGE_DRIVER=db` los bytes se guardan en `BikeImage.data` (BYTEA) y se si
 - `GET /api/images/:key?variant=thumb` sirve la miniatura; si la fila es legacy, cae a la imagen full. Las respuestas siguen siendo `Cache-Control: public, max-age=31536000, immutable`.
 - Máximo **10 fotos por publicación**, deduplicadas por checksum SHA-256 de la imagen optimizada. Los duplicados dentro de un lote se descartan sin error.
 - La subida es **de a un archivo por request** (body limit de Vercel ~4.5 MB); el frontend itera en el servicio.
+- Desde el celular (24/11/2026) el panel **comprime cada foto antes de enviarla** (`frontend/src/lib/image-upload.ts`): reescribe a JPG de hasta 1600 px / calidad 82, convierte HEIC/HEIF cuando el navegador puede decodificarlos y deja intactos los JPG/PNG/WebP de hasta 1,5 MB. Motivo: los 413 repetidos en `POST /api/bikes/:id/images` eran fotos de teléfono por encima del límite del body. El formulario muestra el error concreto (tamaño, validación, sesión vencida o conexión) en vez del genérico "Revisá los datos", y si falla una foto después de crear la moto se queda en edición para reintentar sin duplicarla. Además, una moto nueva con fotos pendientes se crea como borrador y recién pasa al estado elegido cuando todas las imágenes subieron, para que no quede visible en el catálogo sin fotos.
 - Al borrar una foto o una moto se eliminan los binarios. En `db` los bytes van con la fila por `ON DELETE CASCADE`; en local/S3 se borran el full y el `-thumb.webp`.
 - Nota: por el caché `immutable` del CDN, una URL ya visitada puede seguir respondiendo desde caché unos minutos tras borrar su fila. No afecta la BD ni a los listados.
 
@@ -114,7 +115,7 @@ Existe un usuario `ADMIN` creado en Neon. Sus credenciales **no se versionan**; 
 
 ### Marcas
 
-El desplegable "Marca" del formulario de publicaciones se pobló con las 9 marcas que ya aparecen en la franja del home: `KTM`, `HUSQVARNA`, `GASGAS`, `BETA`, `SHERCO`, `HONDA`, `YAMAHA`, `KAWASAKI` y `SUZUKI`. Están en la tabla `Brand` de Neon con IDs `cuid` válidos para la validación del formulario. Para agregar otra marca hace falta insertarla en `Brand` (no hay alta pública ni endpoint de administración de marcas).
+El desplegable "Marca" del formulario de publicaciones se popula desde la tabla `Brand` de Neon (también alimenta el filtro del catálogo). Las 9 marcas originales que aparecen en la franja del home son `KTM`, `HUSQVARNA`, `GASGAS`, `BETA`, `SHERCO`, `HONDA`, `YAMAHA`, `KAWASAKI` y `SUZUKI`. El 24/11/2026 se agregó `MORINI` (id `cmwux4ssasnr991c98348a766`, slug `morini`) para el desplegable; la franja del home sigue mostrando las 9 marcas originales. Los IDs son `cuid` válidos para la validación del formulario. Para agregar otra marca hace falta insertarla en `Brand` (no hay alta pública ni endpoint de administración de marcas).
 
 ---
 

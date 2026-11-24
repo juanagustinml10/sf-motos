@@ -25,6 +25,8 @@ import {
 import { Link } from '@/components/shared/Link';
 import { bikesService, type CreateBikeInput } from '@/services/bikes';
 import type { Bike, BikeCondition, BikeImage, BikeStatus, BikeUsage } from '@/types';
+import { getApiErrorMessage } from '@/lib/api-error';
+import { prepareImageForUpload } from '@/lib/image-upload';
 import { cn } from '@/lib/utils';
 import { BIKE_USAGES, MAX_IMAGES_PER_BIKE, MAX_MODEL_YEAR, MODEL_YEARS } from '@/lib/constants';
 import { usageLabel } from '@/lib/format';
@@ -94,7 +96,11 @@ const byOrder = (a: BikeImage, b: BikeImage) => a.order - b.order;
 
 export const BikeForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const isEdit = Boolean(id);
+  // Si la creación terminó pero fallaron las fotos, seguimos en edición para
+  // no perder el formulario ni generar una publicación duplicada al reintentar.
+  const [savedBikeId, setSavedBikeId] = useState<string | null>(null);
+  const bikeIdToUse = id ?? savedBikeId ?? undefined;
+  const isEdit = Boolean(bikeIdToUse);
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
@@ -102,6 +108,8 @@ export const BikeForm: React.FC = () => {
   const [bike, setBike] = useState<Bike | null>(null);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [savingStage, setSavingStage] = useState<'data' | 'images' | null>(null);
+  const [preparingImages, setPreparingImages] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormValues>(emptyForm);
   const [features, setFeatures] = useState<FeatureDraft[]>([]);
@@ -177,18 +185,35 @@ export const BikeForm: React.FC = () => {
   const updateFeature = (index: number, patch: Partial<FeatureDraft>) =>
     setFeatures((prev) => prev.map((feature, i) => (i === index ? { ...feature, ...patch } : feature)));
 
-  const handleNewImages = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNewImages = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
-    if (files.length > 0) {
-      setNewImages((prev) => {
-        const room = Math.max(
-          0,
-          MAX_IMAGES_PER_BIKE - existingImages.length - prev.length,
-        );
-        return [...prev, ...files.slice(0, room)];
-      });
-    }
     event.target.value = '';
+    if (files.length === 0) return;
+
+    const room = Math.max(
+      0,
+      MAX_IMAGES_PER_BIKE - existingImages.length - newImages.length,
+    );
+    if (room === 0) {
+      setError(`Podés subir hasta ${MAX_IMAGES_PER_BIKE} fotos por publicación.`);
+      return;
+    }
+
+    setPreparingImages(true);
+    setError(null);
+    try {
+      // Las fotos del celular se achican acá: el body de Vercel y el límite
+      // del backend son de ~4 MB, y un JPG de 12 MP suele superarlos.
+      const prepared = await Promise.all(files.slice(0, room).map(prepareImageForUpload));
+      setNewImages((prev) => [...prev, ...prepared]);
+      if (files.length > room) {
+        setError(`Solo se agregaron ${room} foto(s); el máximo es ${MAX_IMAGES_PER_BIKE}.`);
+      }
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'No se pudieron preparar las fotos. Probá con otras imágenes.'));
+    } finally {
+      setPreparingImages(false);
+    }
   };
 
   const swap = <T,>(items: T[], from: number, to: number): T[] => {
@@ -242,7 +267,14 @@ export const BikeForm: React.FC = () => {
       return;
     }
 
+    // Si la moto todavía no tiene fotos, se crea como borrador y recién se
+    // publica cuando todas las imágenes subieron. Así nunca queda una moto
+    // visible en el catálogo sin fotografías.
+    const publishAfterImages =
+      newImages.length > 0 && existingImages.length === 0 && status !== 'BORRADOR';
+
     setSaving(true);
+    setSavingStage('data');
     setError(null);
     try {
       const input: CreateBikeInput = {
@@ -264,20 +296,42 @@ export const BikeForm: React.FC = () => {
         features: features
           .filter((feature) => feature.key.trim() && feature.value.trim())
           .map((feature) => ({ key: feature.key.trim(), value: feature.value.trim() })),
-        status,
+        status: publishAfterImages ? 'BORRADOR' : status,
         featured: form.featured,
       };
 
       let saved: Bike;
-      if (isEdit && bike) saved = await bikesService.update(bike.id, input);
+      if (bikeIdToUse) saved = await bikesService.update(bikeIdToUse, input);
       else saved = await bikesService.create(input);
+      setBike(saved);
+      setSavedBikeId(saved.id);
 
-      if (newImages.length > 0) await bikesService.uploadImages(saved.id, newImages);
+      if (newImages.length > 0) {
+        setSavingStage('images');
+        try {
+          await bikesService.uploadImages(saved.id, newImages);
+        } catch (err) {
+          // La moto ya existe como borrador: no navegamos para que se puedan
+          // reintentar las fotos desde el mismo formulario sin duplicarla.
+          setError(
+            `La publicación se guardó como borrador, pero no se pudieron subir las fotos. ${getApiErrorMessage(err, 'Revisá las imágenes e intentá de nuevo.')}`
+          );
+          return;
+        }
+      }
+
+      if (publishAfterImages) {
+        saved = await bikesService.update(saved.id, { status });
+        setBike(saved);
+      }
       navigate('/admin/motos');
-    } catch {
-      setError('No se pudo guardar la publicación. Revisá los datos e intentá de nuevo.');
+    } catch (err) {
+      setError(
+        `No se pudo guardar la publicación. ${getApiErrorMessage(err, 'Revisá los datos e intentá de nuevo.')}`
+      );
     } finally {
       setSaving(false);
+      setSavingStage(null);
     }
   };
 
@@ -290,6 +344,7 @@ export const BikeForm: React.FC = () => {
   }
 
   const imageCount = existingImages.length + newImages.length;
+  const savingLabel = savingStage === 'images' ? 'Subiendo fotos…' : 'Guardando…';
 
   return (
     <div className="pb-16">
@@ -780,13 +835,18 @@ export const BikeForm: React.FC = () => {
                 <span className="flex h-12 w-12 items-center justify-center rounded-none bg-sf-red/10">
                   <Upload size={24} className="text-sf-red" />
                 </span>
-                <span className="text-sm font-semibold text-white">Tocá para agregar fotografías</span>
-                <span className="text-[11px] text-sf-ink-500">JPG, PNG o WebP · hasta {MAX_IMAGES_PER_BIKE} fotos por publicación</span>
+                <span className="text-sm font-semibold text-white">
+                  {preparingImages ? 'Preparando fotografías…' : 'Tocá para agregar fotografías'}
+                </span>
+                <span className="text-[11px] text-sf-ink-500">
+                  JPG, PNG, WebP o HEIC · hasta {MAX_IMAGES_PER_BIKE} fotos por publicación · se comprimen automáticamente
+                </span>
                 <input
                   type="file"
                   multiple
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleNewImages}
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+                  disabled={preparingImages}
+                  onChange={(event) => void handleNewImages(event)}
                   className="hidden"
                 />
               </label>
@@ -947,7 +1007,7 @@ export const BikeForm: React.FC = () => {
                       'w-full border-sf-border-strong bg-transparent text-sf-ink-300 hover:border-sf-ink-400 hover:bg-sf-elevated hover:text-white sm:w-auto'
                     )}
                   >
-                    <Save size={16} /> {saving ? 'Guardando...' : 'Guardar como borrador'}
+                    <Save size={16} /> {saving ? savingLabel : 'Guardar como borrador'}
                   </button>
                   <button
                     type="submit"
@@ -957,7 +1017,7 @@ export const BikeForm: React.FC = () => {
                       'w-full border-sf-red bg-sf-red text-white hover:bg-sf-red-dark sm:w-auto'
                     )}
                   >
-                    <Send size={16} /> {saving ? 'Publicando...' : 'Publicar'}
+                    <Send size={16} /> {saving ? savingLabel : 'Publicar'}
                   </button>
                   <button
                     type="button"
@@ -968,7 +1028,7 @@ export const BikeForm: React.FC = () => {
                       'w-full border-amber-500/60 bg-transparent text-amber-300 hover:bg-amber-500/10 sm:w-auto'
                     )}
                   >
-                    <Info size={16} /> {saving ? 'Guardando...' : 'Reservada'}
+                    <Info size={16} /> {saving ? savingLabel : 'Reservada'}
                   </button>
                   <button
                     type="button"
@@ -979,7 +1039,7 @@ export const BikeForm: React.FC = () => {
                       'w-full border-sf-border-strong bg-transparent text-sf-ink-300 hover:border-sf-ink-400 hover:text-white sm:w-auto'
                     )}
                   >
-                    <Check size={16} /> {saving ? 'Guardando...' : 'Vendida'}
+                    <Check size={16} /> {saving ? savingLabel : 'Vendida'}
                   </button>
                 </>
               )}
