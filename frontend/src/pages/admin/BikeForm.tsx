@@ -209,19 +209,33 @@ export const BikeForm: React.FC = () => {
 
     setPreparingImages(true);
     setError(null);
-    try {
-      // Las fotos del celular se achican acá: el body de Vercel y el límite
-      // del backend son de ~4 MB, y un JPG de 12 MP suele superarlos.
-      const prepared = await Promise.all(files.slice(0, room).map(prepareImageForUpload));
-      setNewImages((prev) => [...prev, ...prepared]);
-      if (files.length > room) {
-        setError(`Solo se agregaron ${room} foto(s); el máximo es ${MAX_IMAGES_PER_BIKE}.`);
+
+    // iPhone/Safari se queda sin memoria si decodificamos varias fotos a la vez.
+    // Se procesan de a una y se conservan las que sí se pudieron preparar.
+    const selected = files.slice(0, room);
+    const prepared: File[] = [];
+    const failures: string[] = [];
+    for (let index = 0; index < selected.length; index += 1) {
+      try {
+        prepared.push(await prepareImageForUpload(selected[index]));
+      } catch (err) {
+        failures.push(getApiErrorMessage(err, 'no se pudo preparar la foto.'));
       }
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'No se pudieron preparar las fotos. Probá con otras imágenes.'));
-    } finally {
-      setPreparingImages(false);
+      // Da un respiro al navegador para que libere el bitmap/canvas anterior.
+      if (index < selected.length - 1) {
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      }
     }
+
+    if (prepared.length > 0) {
+      setNewImages((prev) => [...prev, ...prepared]);
+    }
+    if (failures.length > 0) {
+      setError(`No se pudieron agregar ${failures.length} foto(s): ${failures.join(' · ')}`);
+    } else if (files.length > room) {
+      setError(`Solo se agregaron ${room} foto(s); el máximo es ${MAX_IMAGES_PER_BIKE}.`);
+    }
+    setPreparingImages(false);
   };
 
   const swap = <T,>(items: T[], from: number, to: number): T[] => {
